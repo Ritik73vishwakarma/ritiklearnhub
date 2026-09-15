@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <div>
+    <span class="pill">COLLEGE LEARNING PORTAL</span>
+    <h1>Welcome to <span>Ritik LearnHub</span></h1>
+    <p>Courses, Python videos, student accounts aur AI Assistant — sab ek dashboard mein.</p>
+    <a class="btn" href="{{ url_for('login') }}">Login to Dashboard</a>
+  </div>
+  <div class="hero-card">
+    <div class="avatar">R</div>
+    <h3>Ritik</h3>
+    <p>Learn • Practice • Grow</p>
+  </div>
+</section>
+<div class="grid three">
+  <div class="card"><h3>📚 Courses</h3><p>Admin courses add/remove kar sakta hai.</p></div>
+  <div class="card"><h3>🤖 AI Assistant</h3><p>Python aur study questions ka instant help.</p></div>
+  <div class="card"><h3>👥 Student Access</h3><p>Har student ko unique username/password.</p></div>
+</div>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="topbar"><div><h1>Manage Courses</h1><p class="muted">Course aur YouTube video add karo.</p></div></div>
+<div class="card">
+<form method="post" class="form-grid">
+  <div><label>Course title</label><input name="title" placeholder="Python Functions" required></div>
+  <div><label>YouTube URL</label><input name="youtube_url" placeholder="https://www.youtube.com/watch?v=..." required></div>
+  <div class="wide"><label>Description</label><textarea name="description" placeholder="Course mein kya sikhaya jayega?" required></textarea></div>
+  <div class="wide"><button class="btn">Add Course</button></div>
+</form>
+</div>
+<div class="grid">
+{% for course in courses %}
+<div class="card">
+  <span class="pill">COURSE</span><h3>{{ course['title'] }}</h3><p>{{ course['description'] }}</p>
+  {% if youtube_embed(course['youtube_url']) %}<div class="video"><iframe src="{{ youtube_embed(course['youtube_url']) }}" allowfullscreen></iframe></div>{% endif %}
+  <form method="post" action="{{ url_for('delete_course', course_id=course['id']) }}"><button class="danger">Delete</button></form>
+</div>
+{% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,27 @@
+:root{--bg:#f4f7fb;--card:#fff;--text:hsl(221, 38%, 15%);--muted:#667085;--primary:#5b5bd6;--border:#e6e8ef;--shadow:0 12px 35px rgba(20,30,60,.08)}*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Segoe UI,Arial,sans-serif}
+.nav{height:70px;background:#111827;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 6%;}
+.brand{font-size:21px;font-weight:800;color:#fff;text-decoration:none}
+.navlinks{display:flex;gap:20px}
+.navlinks a{color:#dbe3f0;text-decoration:none}
+.container{width:min(1180px,92%);margin:35px auto}
+.hero{display:grid;grid-template-columns:2fr 1fr;gap:30px;align-items:center;padding:55px 0}
+.hero h1{font-size:52px;line-height:1.05;margin:15px 0}
+.hero h1 span{color:var(--primary)}
+.hero p{font-size:18px;color:var(--muted);max-width:700px}
+.hero-card{background-image: url("img.png"); background-position:cover;background-size:cover;border :1px solid blue;background-color:rgb(115, 115, 209); border-radius:28px;padding:45px;text-align:center;box-shadow:var(--shadow)}
+.avatar{width:90px;height:90px;border-radius:50%;display:grid;place-items:center;background:#fff;color:#3730a3;font-size:42px;font-weight:800;margin:auto}
+.pill{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.08em;background:#ececff;color:#4949a7;padding:7px 10px;border-radius:999px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
+.grid.three{grid-template-columns:repeat(3,1fr)}
+.card,.stat{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:22px;box-shadow:var(--shadow)}
+.stat{display:flex;flex-direction:column;gap:5px}
+.stat b{font-size:28px}
+.stat span,.muted{color:var(--muted)}
+.btn{display:inline-block;border:0;border-radius:10px;background:var(--primary);color:#fff;padding:12px 17px;text-decoration:none;font-weight:700;cursor:pointer}
+.btn.secondary{background:#111827}.full{width:100%;margin-top:12px}
+.auth{max-width:460px;margin:60px auto}
+.auth label,.form-grid label{display:block;margin:15px 0 7px;font-weight:700}
+input,textarea{width:100%;border:1px solid #d9dce5;border-radius:10px;padding:12px;font-size:15px;background:#fff}
+textarea{min-height:110px;resize:vertical}.demo{margin-top:18px;padding:14px;background:#f4f4ff;border-radius:10px;font-size:14px}
+.flash{padding:14px 16px;border-radius:10px;margin-bottom:18px}.flash.success{background:#dcfce7;color:#166534}.flash.error{background:#fee2e2;color:#991b1b}.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px}.actions{display:flex;gap:10px}.dashboard-grid{display:grid;grid-template-columns:1.6fr .9fr;gap:22px;margin-top:25px}.course h3{font-size:20px}.video{margin-top:15px;aspect-ratio:16/9;overflow:hidden;border-radius:12px;background:#111}.video iframe{width:100%;height:100%;border:0}.ai{position:sticky;top:20px;height:fit-content}.ai-title{display:flex;align-items:center;gap:10px}.ai-title h2{margin:0}.ai-dot{width:11px;height:11px;border-radius:50%;background:#22c55e}.chat{height:360px;overflow:auto;background:#f7f8fc;border-radius:12px;padding:12px;margin:15px 0}.bubble{padding:11px 13px;border-radius:13px;margin:9px 0;white-space:pre-wrap;line-height:1.45}.ai-bubble{background:#fff;border:1px solid var(--border);margin-right:25px}.user-bubble{background:#5b5bd6;color:#fff;margin-left:25px}.chat-form{display:flex;gap:8px}.chat-form input{flex:1}.inline-form{display:flex;gap:10px}.inline-form input{max-width:400px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px 15px}.wide{grid-column:1/-1}.table-wrap{overflow:auto;margin-top:20px}table{width:100%;border-collapse:collapse}th,td{padding:13px;border-bottom:1px solid var(--border);text-align:left}.danger{border:0;background:#fee2e2;color:#991b1b;padding:8px 11px;border-radius:8px;cursor:pointer}.small{font-size:13px}@media(max-width:850px){.hero,.dashboard-grid{grid-template-columns:1fr}.grid,.grid.three,.form-grid{grid-template-columns:1fr}.hero h1{font-size:38px}.topbar{align-items:flex-start;gap:15px;flex-direction:column}.inline-form{flex-direction:column}.ai{position:static}}
