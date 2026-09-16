@@ -3,3 +3,4 @@ openai>=1.0
 Werkzeug>=3.0
 gunicorn
 python-dotenv
+psycopg2-binary
