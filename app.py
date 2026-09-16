@@ -3,7 +3,7 @@ import sqlite3
 import secrets
 import string
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify,send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify,send_from_directory, Response
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import os
@@ -26,7 +26,14 @@ def google_verification():
         os.path.dirname(__file__),
         "google1c9c43f38f755c77.html"
     )
-
+@app.route("/robots.txt")
+def robots_txt():
+    return Response(
+        """User-agent: *
+Allow: /
+""",
+        mimetype="text/plain"
+    )
 
 
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "change-this-secret-key-in-production")
