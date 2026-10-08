@@ -1,16 +1,18 @@
 import os
 import secrets
 import string
-import psycopg2
 import smtplib
 
+import psycopg2
 from psycopg2.extras import DictCursor
 from dotenv import load_dotenv
 from functools import wraps
+
 from flask import (
     Flask, render_template, request, redirect,
     url_for, session, flash, jsonify
 )
+
 from werkzeug.security import (
     generate_password_hash, check_password_hash
 )
@@ -30,15 +32,17 @@ app.secret_key = os.environ.get(
 )
 
 
-# PostgreSQL database connection
+# ==============================
+# DATABASE CONNECTION
+# ==============================
+
 class DBConnection:
     def __init__(self):
         database_url = os.environ.get("DATABASE_URL")
 
         if not database_url:
             raise RuntimeError(
-                "DATABASE_URL set nahi hai. Render Environment mein "
-                "PostgreSQL ka Internal Database URL set karo."
+                "DATABASE_URL Render Environment mein set karo."
             )
 
         self.conn = psycopg2.connect(
@@ -73,7 +77,10 @@ def db():
     return DBConnection()
 
 
-# Initialize PostgreSQL tables
+# ==============================
+# CREATE DATABASE TABLES
+# ==============================
+
 def init_db():
     conn = db()
 
@@ -108,13 +115,15 @@ def init_db():
 
             if not admin_password:
                 raise RuntimeError(
-                    "Render Environment mein ADMIN_PASSWORD set karo."
+                    "ADMIN_PASSWORD Render Environment mein set karo."
                 )
 
             conn.execute(
-                """INSERT INTO users
-                   (username, password_hash, role)
-                   VALUES (%s, %s, %s)""",
+                """
+                INSERT INTO users
+                (username, password_hash, role)
+                VALUES (%s, %s, %s)
+                """,
                 (
                     "ritik",
                     generate_password_hash(admin_password),
@@ -128,9 +137,11 @@ def init_db():
 
         if count == 0:
             conn.executemany(
-                """INSERT INTO courses
-                   (title, description, youtube_url)
-                   VALUES (%s, %s, %s)""",
+                """
+                INSERT INTO courses
+                (title, description, youtube_url)
+                VALUES (%s, %s, %s)
+                """,
                 [
                     (
                         "Python Basics",
@@ -155,6 +166,10 @@ def init_db():
         conn.close()
 
 
+# ==============================
+# LOGIN CHECKS
+# ==============================
+
 def login_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -178,10 +193,21 @@ def admin_required(f):
     return wrapper
 
 
+# ==============================
+# PASSWORD GENERATOR
+# ==============================
+
 def make_password(length=10):
     alphabet = string.ascii_letters + string.digits + "!@#$"
-    return "".join(secrets.choice(alphabet) for _ in range(length))
+    return "".join(
+        secrets.choice(alphabet)
+        for _ in range(length)
+    )
 
+
+# ==============================
+# YOUTUBE EMBED
+# ==============================
 
 def youtube_embed(url):
     if not url:
@@ -207,6 +233,10 @@ def inject_helpers():
     return {"youtube_embed": youtube_embed}
 
 
+# ==============================
+# HOME PAGE
+# ==============================
+
 @app.route("/")
 def index():
     if "user_id" in session:
@@ -215,11 +245,18 @@ def index():
     return render_template("index.html")
 
 
+# ==============================
+# LOGIN
+# ==============================
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username = request.form["username"].strip().lower()
-        password = request.form["password"]
+        username = request.form.get(
+            "username", ""
+        ).strip().lower()
+
+        password = request.form.get("password", "")
 
         conn = db()
 
@@ -232,7 +269,9 @@ def login():
         finally:
             conn.close()
 
-        if user and check_password_hash(user["password_hash"], password):
+        if user and check_password_hash(
+            user["password_hash"], password
+        ):
             session["user_id"] = user["id"]
             session["username"] = user["username"]
             session["role"] = user["role"]
@@ -244,13 +283,20 @@ def login():
     return render_template("login.html")
 
 
+# ==============================
+# CHANGE PASSWORD
+# ==============================
+
 @app.route("/login/pass", methods=["GET", "POST"])
 def passe():
     if request.method == "POST":
-        username = request.form["username"].strip().lower()
-        oldpassword = request.form["old_password"]
-        newpass = request.form["new_password"]
-        conpass = request.form["confirm_password"]
+        username = request.form.get(
+            "username", ""
+        ).strip().lower()
+
+        oldpassword = request.form.get("old_password", "")
+        newpass = request.form.get("new_password", "")
+        conpass = request.form.get("confirm_password", "")
 
         conn = db()
 
@@ -261,24 +307,36 @@ def passe():
             ).fetchone()
 
             if not user:
-                flash("Name galat hai, sahi name daalo...")
+                flash("Username galat hai.", "error")
                 return redirect(url_for("passe"))
 
             if not check_password_hash(
                 user["password_hash"], oldpassword
             ):
-                flash("Tumhara purana password galat hai.")
+                flash("Purana password galat hai.", "error")
+                return redirect(url_for("passe"))
+
+            if not newpass:
+                flash("Naya password khaali nahi ho sakta.", "error")
                 return redirect(url_for("passe"))
 
             if newpass != conpass:
-                flash("Password aur confirm password match nahi kar rahe.")
+                flash(
+                    "Password aur confirm password match nahi kar rahe.",
+                    "error"
+                )
                 return redirect(url_for("passe"))
 
-            new_password_hash = generate_password_hash(newpass)
-
             conn.execute(
-                "UPDATE users SET password_hash = %s WHERE id = %s",
-                (new_password_hash, user["id"])
+                """
+                UPDATE users
+                SET password_hash = %s
+                WHERE id = %s
+                """,
+                (
+                    generate_password_hash(newpass),
+                    user["id"]
+                )
             )
 
             conn.commit()
@@ -286,6 +344,12 @@ def passe():
             session["user_id"] = user["id"]
             session["username"] = user["username"]
             session["role"] = user["role"]
+
+        except Exception as exc:
+            conn.rollback()
+            print("CHANGE PASSWORD ERROR:", repr(exc))
+            flash("Password change nahi ho saka.", "error")
+            return redirect(url_for("passe"))
 
         finally:
             conn.close()
@@ -295,11 +359,19 @@ def passe():
     return render_template("passe.html")
 
 
+# ==============================
+# LOGOUT
+# ==============================
+
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("index"))
 
+
+# ==============================
+# DASHBOARD
+# ==============================
 
 @app.route("/dashboard")
 @login_required
@@ -325,37 +397,60 @@ def dashboard():
     )
 
 
+# ==============================
+# ADD AND SHOW USERS
+# EMAIL IS OPTIONAL
+# ==============================
+
 @app.route("/admin/users", methods=["GET", "POST"])
 @admin_required
 def manage_users():
+
     if request.method == "POST":
-        username = request.form["username"].strip().lower()
-        gmail = request.form["gmail"]
 
-        print(username)
-        print(gmail)
+        # Email field missing or empty ho to bhi chalega
+        username = request.form.get(
+            "username", ""
+        ).strip().lower()
 
-        if not username or " " in username:
-            flash("Username valid rakho, spaces nahi.", "error")
+        gmail = request.form.get(
+            "gmail", ""
+        ).strip()
+
+        if not username:
+            flash("Username required hai.", "error")
             return redirect(url_for("manage_users"))
 
-        def create_password(length=8):
-            return "".join(
-                secrets.choice(string.ascii_uppercase)
-                for _ in range(length)
-            )
+        if " " in username:
+            flash("Username mein space nahi hona chahiye.", "error")
+            return redirect(url_for("manage_users"))
 
-        temporary_password = create_password()
-
-        print(temporary_password)
+        # User ke liye temporary password
+        temporary_password = make_password(10)
 
         conn = db()
 
         try:
+            # Check username first
+            existing_user = conn.execute(
+                "SELECT id FROM users WHERE username = %s",
+                (username,)
+            ).fetchone()
+
+            if existing_user:
+                flash(
+                    f"User '{username}' already exist karta hai.",
+                    "error"
+                )
+                return redirect(url_for("manage_users"))
+
+            # Create user
             conn.execute(
-                """INSERT INTO users
-                   (username, password_hash, role)
-                   VALUES (%s, %s, %s)""",
+                """
+                INSERT INTO users
+                (username, password_hash, role)
+                VALUES (%s, %s, %s)
+                """,
                 (
                     username,
                     generate_password_hash(temporary_password),
@@ -363,87 +458,209 @@ def manage_users():
                 )
             )
 
+            # Save user in database
             conn.commit()
 
         except psycopg2.IntegrityError:
             conn.rollback()
-            flash("Ye username already exist karta hai.", "error")
+
+            flash(
+                f"Username '{username}' pehle se exist karta hai.",
+                "error"
+            )
+
+            return redirect(url_for("manage_users"))
+
+        except Exception as exc:
+            conn.rollback()
+
+            print("CREATE USER ERROR:", repr(exc))
+
+            flash(
+                "User create nahi ho saka. Render Logs check karo.",
+                "error"
+            )
+
             return redirect(url_for("manage_users"))
 
         finally:
             conn.close()
 
-        try:
-            sender = gmail
-            apppass = os.environ.get("password_google", "")
-            receiver = "Ritiklearnhub@gmail.com"
+        # ==================================
+        # EMAIL OPTIONAL
+        # ==================================
 
-            message = f"""Subject: Your Password
+        email_sent = False
 
-Your Password Is: {temporary_password}
-This is your temporary password.
+        # Email khaali hai to email bhejne ki koshish bhi nahi hogi
+        if gmail:
+
+            try:
+                sender = os.environ.get(
+                    "GMAIL_SENDER", ""
+                ).strip()
+
+                app_password = os.environ.get(
+                    "password_google", ""
+                ).strip()
+
+                # Gmail settings available hon tabhi send karo
+                if sender and app_password:
+
+                    message = f"""Subject: Ritik Learning Hub Login
+
+Hello {username},
+
+Your account has been created.
+
+Username: {username}
+Password: {temporary_password}
+
+Please change your password after login.
+
+Ritik Learning Hub
 """
 
-            with smtplib.SMTP("smtp.gmail.com", 587) as server:
-                server.starttls()
-                server.login(sender, apppass)
-                server.sendmail(sender, receiver, message)
+                    with smtplib.SMTP(
+                        "smtp.gmail.com",
+                        587,
+                        timeout=20
+                    ) as server:
 
-            print("Password is successfully sent")
+                        server.starttls()
+                        server.login(sender, app_password)
 
-        except Exception as exc:
-            print("Message is not sent:", repr(exc))
+                        server.sendmail(
+                            sender,
+                            gmail,
+                            message
+                        )
 
-        flash(
-            f"User {username} create ho gaya. "
-            f"Temporary password: {temporary_password} "
-            f"gmail= {gmail}",
-            "success"
-        )
+                    email_sent = True
+
+                else:
+                    print(
+                        "Gmail settings missing. User created "
+                        "without sending email."
+                    )
+
+            except Exception as exc:
+                # Email error se saved user affect nahi hoga
+                print("EMAIL ERROR:", repr(exc))
+
+        # ==================================
+        # SUCCESS MESSAGE
+        # ==================================
+
+        if not gmail:
+            flash(
+                f"User '{username}' create ho gaya. "
+                f"Temporary password: {temporary_password}",
+                "success"
+            )
+
+        elif email_sent:
+            flash(
+                f"User '{username}' create ho gaya aur "
+                "password email par bhej diya gaya.",
+                "success"
+            )
+
+        else:
+            flash(
+                f"User '{username}' create ho gaya, lekin email "
+                f"nahi bheja ja saka. Temporary password: "
+                f"{temporary_password}",
+                "success"
+            )
 
         return redirect(url_for("manage_users"))
+
+    # ==================================
+    # DISPLAY USERS
+    # ==================================
 
     conn = db()
 
     try:
         users = conn.execute(
-            """SELECT id, username, role, created_at
-               FROM users ORDER BY id DESC"""
+            """
+            SELECT id, username, role, created_at
+            FROM users
+            ORDER BY id DESC
+            """
         ).fetchall()
+
+    except Exception as exc:
+        print("LOAD USERS ERROR:", repr(exc))
+
+        flash("Users load nahi ho paaye.", "error")
+        users = []
 
     finally:
         conn.close()
 
-    return render_template("users.html", users=users)
+    return render_template(
+        "users.html",
+        users=users
+    )
 
 
-@app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
+# ==============================
+# DELETE USER
+# ==============================
+
+@app.route(
+    "/admin/users/<int:user_id>/delete",
+    methods=["POST"]
+)
 @admin_required
 def delete_user(user_id):
     conn = db()
 
     try:
         conn.execute(
-            "DELETE FROM users WHERE id = %s AND role != 'admin'",
+            """
+            DELETE FROM users
+            WHERE id = %s AND role != 'admin'
+            """,
             (user_id,)
         )
 
         conn.commit()
 
+    except Exception as exc:
+        conn.rollback()
+        print("DELETE USER ERROR:", repr(exc))
+        flash("User delete nahi ho saka.", "error")
+
+    else:
+        flash("User delete kar diya.", "success")
+
     finally:
         conn.close()
 
-    flash("User delete kar diya.", "success")
     return redirect(url_for("manage_users"))
 
+
+# ==============================
+# ADD AND SHOW COURSES
+# ==============================
 
 @app.route("/admin/courses", methods=["GET", "POST"])
 @admin_required
 def manage_courses():
+
     if request.method == "POST":
-        title = request.form["title"].strip()
-        description = request.form["description"].strip()
-        youtube_url = request.form["youtube_url"].strip()
+
+        title = request.form.get("title", "").strip()
+        description = request.form.get(
+            "description", ""
+        ).strip()
+
+        youtube_url = request.form.get(
+            "youtube_url", ""
+        ).strip()
 
         if not title:
             flash("Course title required hai.", "error")
@@ -453,18 +670,27 @@ def manage_courses():
 
         try:
             conn.execute(
-                """INSERT INTO courses
-                   (title, description, youtube_url)
-                   VALUES (%s, %s, %s)""",
+                """
+                INSERT INTO courses
+                (title, description, youtube_url)
+                VALUES (%s, %s, %s)
+                """,
                 (title, description, youtube_url)
             )
 
             conn.commit()
 
+        except Exception as exc:
+            conn.rollback()
+            print("ADD COURSE ERROR:", repr(exc))
+            flash("Course add nahi ho saka.", "error")
+
+        else:
+            flash("Course add ho gaya.", "success")
+
         finally:
             conn.close()
 
-        flash("Course add ho gaya.", "success")
         return redirect(url_for("manage_courses"))
 
     conn = db()
@@ -477,10 +703,20 @@ def manage_courses():
     finally:
         conn.close()
 
-    return render_template("courses.html", courses=courses)
+    return render_template(
+        "courses.html",
+        courses=courses
+    )
 
 
-@app.route("/admin/courses/<int:course_id>/delete", methods=["POST"])
+# ==============================
+# DELETE COURSE
+# ==============================
+
+@app.route(
+    "/admin/courses/<int:course_id>/delete",
+    methods=["POST"]
+)
 @admin_required
 def delete_course(course_id):
     conn = db()
@@ -493,17 +729,30 @@ def delete_course(course_id):
 
         conn.commit()
 
+    except Exception as exc:
+        conn.rollback()
+        print("DELETE COURSE ERROR:", repr(exc))
+        flash("Course delete nahi ho saka.", "error")
+
+    else:
+        flash("Course delete kar diya.", "success")
+
     finally:
         conn.close()
 
-    flash("Course delete kar diya.", "success")
     return redirect(url_for("manage_courses"))
 
+
+# ==============================
+# AI ASSISTANT
+# ==============================
 
 @app.route("/api/ask-ai", methods=["POST"])
 @login_required
 def ask_ai():
+
     data = request.get_json(silent=True) or {}
+
     question = data.get("question", "").strip()
 
     if not question:
@@ -535,10 +784,10 @@ def ask_ai():
                 {
                     "role": "system",
                     "content": (
-                        "You are Ritik LearnHub AI Assistant. "
+                        "You are Ritik Learning Hub AI Assistant. "
                         "Help students with Python, programming, "
-                        "courses and study questions. "
-                        "Explain concepts step-by-step in simple English. "
+                        "courses and study questions. Explain "
+                        "concepts step-by-step in simple English. "
                         "Use examples and code when useful."
                     )
                 },
@@ -570,9 +819,16 @@ def ask_ai():
         }), 500
 
 
-# Initialize database tables when the app starts
+# ==============================
+# INITIALIZE DATABASE
+# ==============================
+
 init_db()
 
+
+# ==============================
+# RUN APP
+# ==============================
 
 if __name__ == "__main__":
     app.run(debug=False)
