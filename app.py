@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import string
 import secrets
+import psycopg2
 import os
 import os
 from dotenv import load_dotenv
@@ -26,8 +27,8 @@ DB = os.path.join(os.path.dirname(__file__), "learnhub.db")
 
 
 def db():
-    conn = sqlite3.connect(DB)
-    conn.row_factory = sqlite3.Row
+    conn=psycopg2.connect(os.environ["DATABASE_URL"])
+    
     return conn
 
 
