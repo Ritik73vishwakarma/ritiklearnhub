@@ -33,28 +33,39 @@ app.secret_key = os.environ.get(
 # PostgreSQL database connection
 class DBConnection:
     def __init__(self):
+        database_url = os.environ.get("DATABASE_URL")
+
+        if not database_url:
+            raise RuntimeError(
+                "DATABASE_URL set nahi hai. Render Environment mein "
+                "PostgreSQL ka Internal Database URL set karo."
+            )
+
         self.conn = psycopg2.connect(
-            os.environ["DATABASE_URL"],
+            database_url,
             cursor_factory=DictCursor
         )
-        self.cur = self.conn.cursor()
 
     def cursor(self):
-        return self.cur
+        return self.conn.cursor()
 
     def execute(self, query, params=None):
-        self.cur.execute(query, params)
-        return self.cur
+        cur = self.conn.cursor()
+        cur.execute(query, params)
+        return cur
 
     def executemany(self, query, params):
-        self.cur.executemany(query, params)
-        return self.cur
+        cur = self.conn.cursor()
+        cur.executemany(query, params)
+        return cur
 
     def commit(self):
         self.conn.commit()
 
+    def rollback(self):
+        self.conn.rollback()
+
     def close(self):
-        self.cur.close()
         self.conn.close()
 
 
@@ -137,7 +148,7 @@ def init_db():
         conn.commit()
 
     except Exception:
-        conn.conn.rollback()
+        conn.rollback()
         raise
 
     finally:
@@ -149,7 +160,9 @@ def login_required(f):
     def wrapper(*args, **kwargs):
         if "user_id" not in session:
             return redirect(url_for("login"))
+
         return f(*args, **kwargs)
+
     return wrapper
 
 
@@ -159,7 +172,9 @@ def admin_required(f):
         if session.get("role") != "admin":
             flash("Admin access required.", "error")
             return redirect(url_for("dashboard"))
+
         return f(*args, **kwargs)
+
     return wrapper
 
 
@@ -174,10 +189,13 @@ def youtube_embed(url):
 
     if "youtu.be/" in url:
         video_id = url.split("youtu.be/")[-1].split("?")[0]
+
     elif "watch?v=" in url:
         video_id = url.split("watch?v=")[-1].split("&")[0]
+
     elif "youtube.com/embed/" in url:
         video_id = url.split("youtube.com/embed/")[-1].split("?")[0]
+
     else:
         return ""
 
@@ -193,6 +211,7 @@ def inject_helpers():
 def index():
     if "user_id" in session:
         return redirect(url_for("dashboard"))
+
     return render_template("index.html")
 
 
@@ -203,18 +222,21 @@ def login():
         password = request.form["password"]
 
         conn = db()
-        user = conn.execute(
-            "SELECT * FROM users WHERE username = %s",
-            (username,)
-        ).fetchone()
-        conn.close()
 
-        if user and check_password_hash(
-            user["password_hash"], password
-        ):
+        try:
+            user = conn.execute(
+                "SELECT * FROM users WHERE username = %s",
+                (username,)
+            ).fetchone()
+
+        finally:
+            conn.close()
+
+        if user and check_password_hash(user["password_hash"], password):
             session["user_id"] = user["id"]
             session["username"] = user["username"]
             session["role"] = user["role"]
+
             return redirect(url_for("dashboard"))
 
         flash("Username ya password galat hai.", "error")
@@ -231,41 +253,42 @@ def passe():
         conpass = request.form["confirm_password"]
 
         conn = db()
-        user = conn.execute(
-            "SELECT * FROM users WHERE username = %s",
-            (username,)
-        ).fetchone()
 
-        if not user:
+        try:
+            user = conn.execute(
+                "SELECT * FROM users WHERE username = %s",
+                (username,)
+            ).fetchone()
+
+            if not user:
+                flash("Name galat hai, sahi name daalo...")
+                return redirect(url_for("passe"))
+
+            if not check_password_hash(
+                user["password_hash"], oldpassword
+            ):
+                flash("Tumhara purana password galat hai.")
+                return redirect(url_for("passe"))
+
+            if newpass != conpass:
+                flash("Password aur confirm password match nahi kar rahe.")
+                return redirect(url_for("passe"))
+
+            new_password_hash = generate_password_hash(newpass)
+
+            conn.execute(
+                "UPDATE users SET password_hash = %s WHERE id = %s",
+                (new_password_hash, user["id"])
+            )
+
+            conn.commit()
+
+            session["user_id"] = user["id"]
+            session["username"] = user["username"]
+            session["role"] = user["role"]
+
+        finally:
             conn.close()
-            flash("Name galat hai, sahi name daalo...")
-            return redirect(url_for("passe"))
-
-        if not check_password_hash(
-            user["password_hash"], oldpassword
-        ):
-            conn.close()
-            flash("Tumhara purana password galat hai.")
-            return redirect(url_for("passe"))
-
-        if newpass != conpass:
-            conn.close()
-            flash("Password aur confirm password match nahi kar rahe.")
-            return redirect(url_for("passe"))
-
-        new_password_hash = generate_password_hash(newpass)
-
-        conn.execute(
-            "UPDATE users SET password_hash = %s WHERE id = %s",
-            (new_password_hash, user["id"])
-        )
-
-        session["user_id"] = user["id"]
-        session["username"] = user["username"]
-        session["role"] = user["role"]
-
-        conn.commit()
-        conn.close()
 
         return redirect(url_for("dashboard"))
 
@@ -283,15 +306,17 @@ def logout():
 def dashboard():
     conn = db()
 
-    courses = conn.execute(
-        "SELECT * FROM courses ORDER BY id DESC"
-    ).fetchall()
+    try:
+        courses = conn.execute(
+            "SELECT * FROM courses ORDER BY id DESC"
+        ).fetchall()
 
-    users_count = conn.execute(
-        "SELECT COUNT(*) FROM users"
-    ).fetchone()[0]
+        users_count = conn.execute(
+            "SELECT COUNT(*) FROM users"
+        ).fetchone()[0]
 
-    conn.close()
+    finally:
+        conn.close()
 
     return render_template(
         "dashboard.html",
@@ -321,6 +346,7 @@ def manage_users():
             )
 
         temporary_password = create_password()
+
         print(temporary_password)
 
         conn = db()
@@ -339,52 +365,54 @@ def manage_users():
 
             conn.commit()
 
-            try:
-                sender = gmail
-                apppass = os.environ.get("password_google", "")
-                receiver = "Ritiklearnhub@gmail.com"
+        except psycopg2.IntegrityError:
+            conn.rollback()
+            flash("Ye username already exist karta hai.", "error")
+            return redirect(url_for("manage_users"))
 
-                message = f"""Subject: Your Password
+        finally:
+            conn.close()
+
+        try:
+            sender = gmail
+            apppass = os.environ.get("password_google", "")
+            receiver = "Ritiklearnhub@gmail.com"
+
+            message = f"""Subject: Your Password
 
 Your Password Is: {temporary_password}
 This is your temporary password.
 """
 
-                server = smtplib.SMTP("smtp.gmail.com", 587)
+            with smtplib.SMTP("smtp.gmail.com", 587) as server:
                 server.starttls()
                 server.login(sender, apppass)
                 server.sendmail(sender, receiver, message)
-                server.quit()
 
-                print("Password is successfully sent")
+            print("Password is successfully sent")
 
-            except Exception as exc:
-                print("Message is not sent:", repr(exc))
+        except Exception as exc:
+            print("Message is not sent:", repr(exc))
 
-            flash(
-                f"User {username} create ho gaya. "
-                f"Temporary password: {temporary_password} "
-                f"gmail= {gmail}",
-                "success"
-            )
-
-        except psycopg2.IntegrityError:
-            conn.conn.rollback()
-            flash("Ye username already exist karta hai.", "error")
-
-        finally:
-            conn.close()
+        flash(
+            f"User {username} create ho gaya. "
+            f"Temporary password: {temporary_password} "
+            f"gmail= {gmail}",
+            "success"
+        )
 
         return redirect(url_for("manage_users"))
 
     conn = db()
 
-    users = conn.execute(
-        """SELECT id, username, role, created_at
-           FROM users ORDER BY id DESC"""
-    ).fetchall()
+    try:
+        users = conn.execute(
+            """SELECT id, username, role, created_at
+               FROM users ORDER BY id DESC"""
+        ).fetchall()
 
-    conn.close()
+    finally:
+        conn.close()
 
     return render_template("users.html", users=users)
 
@@ -394,13 +422,16 @@ This is your temporary password.
 def delete_user(user_id):
     conn = db()
 
-    conn.execute(
-        "DELETE FROM users WHERE id = %s AND role != 'admin'",
-        (user_id,)
-    )
+    try:
+        conn.execute(
+            "DELETE FROM users WHERE id = %s AND role != 'admin'",
+            (user_id,)
+        )
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+
+    finally:
+        conn.close()
 
     flash("User delete kar diya.", "success")
     return redirect(url_for("manage_users"))
@@ -420,26 +451,31 @@ def manage_courses():
 
         conn = db()
 
-        conn.execute(
-            """INSERT INTO courses
-               (title, description, youtube_url)
-               VALUES (%s, %s, %s)""",
-            (title, description, youtube_url)
-        )
+        try:
+            conn.execute(
+                """INSERT INTO courses
+                   (title, description, youtube_url)
+                   VALUES (%s, %s, %s)""",
+                (title, description, youtube_url)
+            )
 
-        conn.commit()
-        conn.close()
+            conn.commit()
+
+        finally:
+            conn.close()
 
         flash("Course add ho gaya.", "success")
         return redirect(url_for("manage_courses"))
 
     conn = db()
 
-    courses = conn.execute(
-        "SELECT * FROM courses ORDER BY id DESC"
-    ).fetchall()
+    try:
+        courses = conn.execute(
+            "SELECT * FROM courses ORDER BY id DESC"
+        ).fetchall()
 
-    conn.close()
+    finally:
+        conn.close()
 
     return render_template("courses.html", courses=courses)
 
@@ -449,13 +485,16 @@ def manage_courses():
 def delete_course(course_id):
     conn = db()
 
-    conn.execute(
-        "DELETE FROM courses WHERE id = %s",
-        (course_id,)
-    )
+    try:
+        conn.execute(
+            "DELETE FROM courses WHERE id = %s",
+            (course_id,)
+        )
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+
+    finally:
+        conn.close()
 
     flash("Course delete kar diya.", "success")
     return redirect(url_for("manage_courses"))
@@ -531,6 +570,9 @@ def ask_ai():
         }), 500
 
 
+# Initialize database tables when the app starts
+init_db()
+
+
 if __name__ == "__main__":
-    init_db()
-    app.run(debug=True)
+    app.run(debug=False)
