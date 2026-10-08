@@ -15,12 +15,10 @@ import smtplib
 
 load_dotenv()
 
-
-
 try:
-    from openai import OpenAI
+    from groq import Groq
 except ImportError:
-    OpenAI = None
+    Groq = None
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "change-this-secret-key-in-production")
@@ -303,31 +301,62 @@ def delete_course(course_id):
 def ask_ai():
     data = request.get_json(silent=True) or {}
     question = data.get("question", "").strip()
-    if not question:
-        return jsonify({"ok": False, "error": "Question empty hai."}), 400
 
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key or OpenAI is None:
+    if not question:
         return jsonify({
             "ok": False,
-            "error": "AI setup nahi hua. OPENAI_API_KEY set karo aur 'pip install openai' chalao."
+            "error": "Question empty hai."
+        }), 400
+
+    api_key = os.environ.get("GROQ_API_KEY")
+
+    if not api_key or Groq is None:
+        return jsonify({
+            "ok": False,
+            "error": "AI setup nahi hua. GROQ_API_KEY set karo aur 'pip install groq' chalao."
         }), 503
 
     try:
-        client = OpenAI(api_key=api_key)
-        response = client.responses.create(
-            model=os.environ.get("OPENAI_MODEL", "gpt-5.6-luna"),
-            instructions=(
-                "You are Ritik LearnHub AI Assistant. "
-                "Help students with Python, programming, courses and study questions. "
-                "Answer clearly, safely and in simple Hinglish when appropriate."
+        client = Groq(api_key=api_key)
+
+        response = client.chat.completions.create(
+            model=os.environ.get(
+                "GROQ_MODEL",
+                "openai/gpt-oss-20b"
             ),
-            input=question
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are Ritik LearnHub AI Assistant. "
+                        "Help students with Python, programming, courses and study questions. "
+                        "Explain concepts step-by-step in simple English. "
+                        "Use examples and code when useful."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": question
+                }
+            ],
+            temperature=0.6,
+            max_completion_tokens=2048
         )
-        return jsonify({"ok": True, "answer": response.output_text})
+
+        answer = response.choices[0].message.content
+
+        return jsonify({
+            "ok": True,
+            "answer": answer
+        })
+
     except Exception as exc:
-        print("AI ERROR:", exc)
-        return jsonify({"ok": False, "error": "AI response nahi aa saka. API key/model check karo."}), 500
+        print("GROQ AI ERROR:", repr(exc))
+
+        return jsonify({
+            "ok": False,
+            "error": "AI response nahi aa saka. GROQ_API_KEY ya GROQ_MODEL check karo."
+        }), 500
 
 
 if __name__ == "__main__":
