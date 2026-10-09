@@ -827,7 +827,7 @@ body.light-mode .chat {
 
     width: fit-content;
 
-    max-width: 92%;
+    max-width: 98%;
 
     margin:
         0 0 12px;
@@ -965,7 +965,7 @@ select {
 
     min-height: 44px;
 
-    padding: 11px 13px;
+    padding: 5px 5px;
 
     border-radius: 11px;
 
