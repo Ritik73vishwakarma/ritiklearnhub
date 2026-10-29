@@ -256,16 +256,9 @@ def robots_txt():
     content = """User-agent: *
 Allow: /
 
-Disallow: /dashboard
-Disallow: /admin/
-Disallow: /api/
-Disallow: /logout
-Disallow: /login/pass
-
 Sitemap: https://ritiklearnhub.onrender.com/sitemap.xml
 """
     return Response(content, mimetype="text/plain")
-
 
 @app.route("/sitemap.xml")
 def sitemap_xml():
