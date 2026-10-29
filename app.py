@@ -10,7 +10,7 @@ from functools import wraps
 
 from flask import (
     Flask, render_template, request, redirect,
-    url_for, session, flash, jsonify
+    url_for, session, flash, jsonify, Response
 )
 
 from werkzeug.security import (
@@ -243,6 +243,42 @@ def index():
         return redirect(url_for("dashboard"))
 
     return render_template("index.html")
+
+
+
+
+# ==============================
+# ROBOTS.TXT AND XML SITEMAP
+# ==============================
+
+@app.route("/robots.txt")
+def robots_txt():
+    content = """User-agent: *
+Allow: /
+
+Disallow: /dashboard
+Disallow: /admin/
+Disallow: /api/
+Disallow: /logout
+Disallow: /login/pass
+
+Sitemap: https://ritiklearnhub.onrender.com/sitemap.xml
+"""
+    return Response(content, mimetype="text/plain")
+
+
+@app.route("/sitemap.xml")
+def sitemap_xml():
+    # Only include the public homepage because the supplied app.py
+    # does not define public About or Contact pages.
+    content = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+        <loc>https://ritiklearnhub.onrender.com/</loc>
+    </url>
+</urlset>
+"""
+    return Response(content, mimetype="application/xml")
 
 
 # ==============================
